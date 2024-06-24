@@ -20,12 +20,14 @@ namespace PhantomControl
         private string iconPath = "Resources\\Icons\\";
 
         URServer urServer = new URServer();
+        
         Settings_tab settingsTab = new Settings_tab();
 
         public ApplicationGUI()
         {
+            //Logger.initialiseLogger();
             InitializeComponent();
-            Logger.initialiseLogger();
+
 
             motionControl_tab.Show();
             settings_tab.Hide();
@@ -130,15 +132,28 @@ namespace PhantomControl
     public static class Logger
     {
         private static string logFilename = "/Log" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
-        private static string logFilePath = "Output Files/Log";
-        public static string logFullPath = string.Empty;
+        private static string logFilePath = "Output Files/Log/Log" + DateTime.Now.ToString("ddMMyy-hhmm");
+        private static string logFullPath = string.Empty;
 
         private static string urScriptName = "/urScript" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
         private static string urScriptPath = "Output Files/GeneratedUrScripts";
         public static string urScriptFullPath = string.Empty;
 
-        public static TextWriter wrireFile;
+        public static bool LogFileNameBOTHBool = false;
 
+        private static string Timestamps1DFilename = "/timestamps1D" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+        private static string Timestamps1DPath = "Output Files/1DPlatform/Timestamps";
+        public static string Timestamps1DFullPath = string.Empty;
+
+        private static string ArduinoGetFilename = "/Get1D" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+        private static string ArduinoGetFilePath = "Output Files/1DPlatform/Arduino/Get";
+        public static string ArduinoGetFullPath = string.Empty;
+
+        private static string ArduinoSendFilename = "/Send1D" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+        private static string ArduinoSendFilePath = "Output Files/1DPlatform/Arduino/Send";
+        public static string ArduinoSendFullPath = string.Empty;
+
+        public static TextWriter wrireFile;
         // NEW LOG FILE
         // new log file is run everytime this class is called
         public static void initialiseLogger()
@@ -153,18 +168,88 @@ namespace PhantomControl
                 Directory.CreateDirectory(urScriptPath);
             }
 
+            if (!Directory.Exists(Timestamps1DPath))
+            {
+                Directory.CreateDirectory(Timestamps1DPath);
+            }
+
+            if (!Directory.Exists(ArduinoGetFilePath))
+            {
+                Directory.CreateDirectory(ArduinoGetFilePath);
+            }
+            
+
+            if (!Directory.Exists(ArduinoSendFilePath))
+            {
+                Directory.CreateDirectory(ArduinoSendFilePath);
+            }
+
             logFullPath = logFilePath + logFilename;
             urScriptFullPath = urScriptPath + urScriptName;
+            Timestamps1DFullPath = Timestamps1DPath + Timestamps1DFilename;
+            ArduinoGetFullPath = ArduinoGetFilePath + ArduinoGetFilename;
+            ArduinoSendFullPath = ArduinoSendFilePath + ArduinoSendFilename;
         }
 
-        public static void initialiseDataFile()
+        //Create a new log file for 6DoF OR 1DoF platform
+        private static void CreateNewLogFile()
         {
-            wrireFile = new StreamWriter("Output Files/MotionData_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt");
+            logFilename = "/Log" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+            logFullPath = logFilePath + logFilename;
+        }
+
+        //Create a new log file for the two platforms simultaneously
+        private static void CreateNewLogFile(string Robot, string filename)
+        {
+            logFilename = "/Log_" + Robot + "_" + filename + "_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+            logFullPath = logFilePath + logFilename;
+        }
+
+        public static void RenameLogFileBOTH(string Robot, string filename)
+        {
+
+            try
+            {
+
+                if (File.Exists(logFullPath))
+                {
+                    CreateNewLogFile(Robot, filename);
+                }
+                
+                LogFileNameBOTHBool = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Can not rename the log file: " + ex.Message);
+            }
+        }
+
+        public static void RenameLogFile(string Robot, string filename)
+        {
+            try
+            {
+                if (File.Exists(logFullPath))
+                {
+                    CreateNewLogFile(Robot, filename);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Can not rename the log file: " + ex.Message);
+            }
+        }
+
+
+        public static void initialiseDataFile(string filename)
+        {
+            string filename2 = filename.Substring(0, filename.Length - 4);
+            wrireFile = new StreamWriter("Output Files/6DPlatform/MotionData_" + filename2 + "_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt");
             TextWriter.Synchronized(wrireFile).WriteLine("Time(s)" + " " + "x(mm)" + " " + "y(mm)" + " " + "z(mm)" + " " + "rx(deg)" + " " + "ry(deg)" + " " + "rz(deg)");
         }
 
         // ADD SOMETHING TO LOG
-        public static void addToLogFile(string text)
+
+    public static void addToLogFile(string text)
         {
             if (UrSettings.writeLogFile == true)
             {
@@ -182,8 +267,7 @@ namespace PhantomControl
 
                 if (filesize > 1 * 1024 * 1024)
                 {
-                    logFilename = "Log" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
-                    logFullPath = logFilePath + logFilename;
+                    CreateNewLogFile();
                 }
             }
         }
@@ -208,6 +292,81 @@ namespace PhantomControl
                 {
                     urScriptName = "Log" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
                     urScriptFullPath = urScriptPath + urScriptName;
+                }
+            }
+
+        }
+
+        public static void addToTimestamps1DFile(string text)
+        {
+            if (UrSettings.writeTimestamps1DFile == true)
+            {
+                using (FileStream logFile = new FileStream(Timestamps1DFullPath, FileMode.Append, FileAccess.Write))
+
+                using (StreamWriter _Log = new StreamWriter(logFile))
+                {
+                    _Log.WriteLine(text);
+                }
+
+                //check log file size, if it is > 1 mb, start a new file
+
+                FileInfo fi = new FileInfo(Timestamps1DFullPath);
+                var filesize = fi.Length;
+
+                if (filesize > 1 * 1024 * 1024)
+                {
+                    Timestamps1DFilename = "timestamp1D" + "_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+                    Timestamps1DFullPath = Timestamps1DPath + Timestamps1DFilename;
+                }
+            }
+
+        }
+
+        public static void addToArduinoGetFile(string text)
+        {
+            if (UrSettings.writeArduinoGetFile == true)
+            {
+                using (FileStream ArduinoGetFile = new FileStream(ArduinoGetFullPath, FileMode.Append, FileAccess.Write))
+
+                using (StreamWriter _Log = new StreamWriter(ArduinoGetFile))
+                {
+                    _Log.WriteLine(text);
+                }
+
+                //check log file size, if it is > 1 mb, start a new file
+
+                FileInfo fi = new FileInfo(ArduinoGetFullPath);
+                var filesize = fi.Length;
+
+                if (filesize > 1 * 1024 * 1024)
+                {
+                    ArduinoGetFilename = "Get" + "_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+                    ArduinoGetFullPath = ArduinoGetFilePath + ArduinoGetFilename;
+                }
+            }
+
+        }
+
+        public static void addToArduinoSendFile(string text)
+        {
+            if (UrSettings.writeArduinoSendFile == true)
+            {
+                using (FileStream ArduinoSendFile = new FileStream(ArduinoSendFullPath, FileMode.Append, FileAccess.Write))
+
+                using (StreamWriter _Log = new StreamWriter(ArduinoSendFile))
+                {
+                    _Log.WriteLine(text);
+                }
+
+                //check log file size, if it is > 1 mb, start a new file
+
+                FileInfo fi = new FileInfo(ArduinoSendFullPath);
+                var filesize = fi.Length;
+
+                if (filesize > 1 * 1024 * 1024)
+                {
+                    ArduinoSendFilename = "Send" + "_" + DateTime.Now.ToString("ddMMyy-hhmm") + ".txt";
+                    ArduinoSendFullPath = ArduinoSendFilePath + ArduinoSendFilename;
                 }
             }
 
